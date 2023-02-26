@@ -1,7 +1,7 @@
 /*
  * ==========================================================================
  * getreal.c
- * v0.1.0
+ * v0.1.1
  * 2023-02-26
  * ==========================================================================
  * by cs127
@@ -55,7 +55,6 @@ const char CIPHER [256] = {
 };
 
 const char S3M_MAGIC [4] = "SCRM";
-const char S3M_TYPE = 0x10;
 
 
 void gr_cipher(char* pattern, uint16_t psize) {
@@ -148,13 +147,11 @@ int main(int argc, char** argv) {
     // check if the file is a valid S3M file
 
     char magic [4];
-    char type;
+
     fseek(outfile, 0x002C, SEEK_SET);
     fread(magic, 4, 1, outfile);
-    fseek(outfile, 0x001D, SEEK_SET);
-    fread(&type, 1, 1, outfile);
 
-    if (memcmp(magic, S3M_MAGIC, 4) || type != S3M_TYPE) {
+    if (memcmp(magic, S3M_MAGIC, 4)) {
         fprintf(stderr, "Error: Input file does not seem like an S3M file\n");
         return GR_EXIT_INVALID_FILE_FORMAT;
     }
@@ -175,7 +172,7 @@ int main(int argc, char** argv) {
     fseek(outfile, 0x0060 + ordnum + insnum * 2, SEEK_SET);
     if (fread(ppos, 2, patnum, outfile) < patnum) {
         gr_fclear(outfile, outpath);
-        fprintf(stderr, "Error: List of pattern offsets is too short");
+        fprintf(stderr, "Error: List of pattern offsets is too short\n");
         return GR_EXIT_FILE_OUT_OF_BOUNDS;
     }
 
