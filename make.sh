@@ -1,3 +1,4 @@
 #!/bin/bash
 
-cc getreal.c -o getreal
+cd "$(dirname $0)"
+cc src/getreal.c -o bin/getreal
