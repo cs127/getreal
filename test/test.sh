@@ -7,8 +7,13 @@ echo "Executable not found. Compile the source code first." &&
 exit 16
 
 echo ""
-echo "Decrypting MUSIC0.S3M to MUSIC0_U.S3M..."
-../bin/getreal MUSIC0.S3M MUSIC0_U.S3M
+echo "Test:"
+echo "music0.s3m will be copied to music0_d.s3m and then decrypted."
+echo "music1.s3m will be copied to music1_d.s3m and then decrypted."
 echo ""
-echo "Decrypting MUSIC1.S3M to MUSIC1_U.S3M..."
-../bin/getreal MUSIC1.S3M MUSIC1_U.S3M
+cp music0.s3m music0_d.s3m
+cp music1.s3m music1_d.s3m
+../bin/getreal music0_d.s3m music1_d.s3m
+echo ""
+echo "DONE"
+echo ""

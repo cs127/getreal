@@ -1,8 +1,8 @@
 /*
  * ==========================================================================
  * getreal.c
- * v0.1.1
- * 2023-02-26
+ * v1.0.0-alpha1
+ * 2023-02-27
  * ==========================================================================
  * by cs127
  * https://cs127.github.io
@@ -12,12 +12,11 @@
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC0.S3M
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC1.S3M
  * ==========================================================================
- * Yes, I am aware that my code is shitty.
+ * update v1.0.0-alpha1 / 2023-02-27: I have slightly unshittified the code.
  * ==========================================================================
  */
 
 
-#include <stdlib.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <errno.h>
@@ -25,13 +24,22 @@
 
 
 typedef enum GRExitCode {
+
+    // all files successfully processed
     GR_EXIT_OK                  = 0,
-    GR_EXIT_INF_ERROR           = 1,
-    GR_EXIT_OUTF_ERROR          = 2,
-    GR_EXIT_INVALID_ARGC        = 4,
-    GR_EXIT_INVALID_FILE_FORMAT = 8,
-    GR_EXIT_FILE_OUT_OF_BOUNDS  = 9,
-    GR_EXIT_MISC                = 127
+
+    // no file specified
+    GR_EXIT_NO_FILE             = 1,
+
+    // errors, added together as flags
+    // each flag is set if the corresponding error is in at least one file
+    GR_EXIT_IO_ERROR            = 2,
+    GR_EXIT_INVALID_FILE_FORMAT = 4,
+    GR_EXIT_FILE_OUT_OF_BOUNDS  = 8,
+
+    // skill issue
+    GR_EXIT_MISC                = 64
+
 } GRExitCode;
 
 
@@ -59,159 +67,149 @@ const char S3M_MAGIC [4] = "SCRM";
 
 void gr_cipher(char* pattern, uint16_t psize) {
 
-    // loop starts from 2 because the first two bytes are the size
+    // loop starts from bpos=2 because the first two bytes are the size
 
-    for (uint16_t bpos = 2; bpos < psize; bpos++) {
+    for (uint16_t bpos = 2; bpos < psize; bpos++)
         pattern[bpos] = pattern[bpos] ^ CIPHER[bpos & 0xFF];
-    }
 
 }
 
-void gr_fclear(FILE* file, const char* path) {
 
-    freopen(path, "w", file);
-    fclose(file);
+void gr_error(const char* msg, const char* path) {
+
+    fprintf(stderr, "Error in file %s: %s\n", path, msg);
+
+}
+
+
+void gr_warn(const char* msg, const char* path) {
+
+    fprintf(stderr, "Warning in file %s: %s\n", path, msg);
 
 }
 
-GRExitCode gr_ioerror(GRExitCode code, FILE* file, const char* path) {
-
-    if (code == GR_EXIT_OK) return code;
-
-    int en = errno;
-    char msg [80];
-
-    if (file) gr_fclear(file, path);
-
-    switch (code) {
-
-        case GR_EXIT_INF_ERROR:
-            sprintf(msg, "Error in processing the input file");
-            break;
-
-        case GR_EXIT_OUTF_ERROR:
-            sprintf(msg, "Error in processing the output file");
-            break;
-
-        default:
-            sprintf(msg, "Error");
-            break;
-
-    }
-
-    fprintf(stderr, "%s: %s\n", msg, strerror(en));
-    return code;
-
-}
 
 int main(int argc, char** argv) {
 
     if (argc <= 1) {
         fprintf(stderr, "Error: No files specified\n");
-        return GR_EXIT_INVALID_ARGC;
+        return GR_EXIT_NO_FILE;
     }
 
-    char* buffer,* inpath,* outpath;
-    FILE* infile,* outfile;
+    FILE* file;
     uint16_t ordnum, insnum, patnum, pidx, psize;
-    size_t filesize;
+    size_t filesize, fileidx;
+    int exitcode = GR_EXIT_OK;
+    char magic [4], tmpmsg [256];
 
-    inpath = argv[1];
-    outpath = (argc > 2) ? argv[2] : argv[1];
+    // loop through every specified file
 
-    // copy input file to output file
+    for (fileidx = 1; fileidx < argc; fileidx++) {
 
-    if (!(infile = fopen(inpath, "rb")))
-        return gr_ioerror(GR_EXIT_INF_ERROR, NULL, NULL);
+        puts("========================================");
 
-    fseek(infile, 0, SEEK_END);
-    filesize = ftell(infile);
-    rewind(infile); // be kind, rewind :)
+        printf("Processing file %s\n", argv[fileidx]);
 
-    if (!(buffer = malloc(filesize))) {
-        fclose(infile);
-        return gr_ioerror(GR_EXIT_INF_ERROR, NULL, NULL);
-    }
-    fread(buffer, filesize, 1, infile);
-    fclose(infile);
+        // load file
 
-    if (!(outfile = fopen(outpath, "w+b")))
-        return gr_ioerror(GR_EXIT_OUTF_ERROR, NULL, NULL);
-
-    if (fwrite(buffer, filesize, 1, outfile) < 1) {
-        free(buffer);
-        return gr_ioerror(GR_EXIT_OUTF_ERROR, outfile, outpath);
-    }
-    free(buffer);
-
-    // check if the file is a valid S3M file
-
-    char magic [4];
-
-    fseek(outfile, 0x002C, SEEK_SET);
-    fread(magic, 4, 1, outfile);
-
-    if (memcmp(magic, S3M_MAGIC, 4)) {
-        fprintf(stderr, "Error: Input file does not seem like an S3M file\n");
-        return GR_EXIT_INVALID_FILE_FORMAT;
-    }
-
-    // read number of orders, samples, and patterns
-
-    fseek(outfile, 0x0020, SEEK_SET);
-    fread(&ordnum, 2, 1, outfile);
-    fread(&insnum, 2, 1, outfile);
-    fread(&patnum, 2, 1, outfile);
-
-    if (ordnum & 0x0001)
-        fprintf(stderr, "Warning: OrdNum is an odd number\n");
-
-    // read pattern pointers
-
-    uint16_t ppos [patnum];
-    fseek(outfile, 0x0060 + ordnum + insnum * 2, SEEK_SET);
-    if (fread(ppos, 2, patnum, outfile) < patnum) {
-        gr_fclear(outfile, outpath);
-        fprintf(stderr, "Error: List of pattern offsets is too short\n");
-        return GR_EXIT_FILE_OUT_OF_BOUNDS;
-    }
-
-    // process patterns
-
-    printf("Processing %d patterns...", patnum);
-
-    for (pidx = 0; pidx < patnum; pidx++) {
-
-        if (ppos[pidx] << 4 >= filesize) {
-            gr_fclear(outfile, outpath);
-            fprintf(stderr, "Error: Offset too large for pattern %d\n", pidx);
-            return GR_EXIT_FILE_OUT_OF_BOUNDS;
-        }
-        if (!ppos[pidx]) continue;
-
-        fseek(outfile, ppos[pidx] << 4, SEEK_SET);
-        fread(&psize, 2, 1, outfile);           // read first two bytes as size
-        fseek(outfile, -2, SEEK_CUR);
-
-        char pattern [psize];
-        if (fread(pattern, psize, 1, outfile) < 1) {
-            gr_fclear(outfile, outpath);
-            fprintf(stderr, "Error: Pattern %d ends prematurely\n", pidx);
-            return GR_EXIT_FILE_OUT_OF_BOUNDS;
+        if (!(file = fopen(argv[fileidx], "r+b"))) {
+            gr_error(strerror(errno), argv[fileidx]);
+            exitcode |= GR_EXIT_IO_ERROR;
+            continue;
         }
 
-        fseek(outfile, -psize, SEEK_CUR);
-        gr_cipher(pattern, psize);              // de(/en)crypt the data
-        if (fwrite(pattern, psize, 1, outfile) < 1) {
-            gr_fclear(outfile, outpath);
-            fprintf(stderr, "Error: Could not write pattern %d\n", pidx);
-            return GR_EXIT_OUTF_ERROR;
+        // get file size
+
+        fseek(file, 0, SEEK_END);
+        filesize = ftell(file);
+        rewind(file); // be kind, rewind :)
+
+        // check if the file is a valid S3M file
+
+        fseek(file, 0x002C, SEEK_SET);
+        fread(magic, 4, 1, file);
+
+        if (memcmp(magic, S3M_MAGIC, 4)) {
+            gr_error("Not a valid S3M file", argv[fileidx]);
+            exitcode |= GR_EXIT_INVALID_FILE_FORMAT;
+            continue;
         }
+
+        // read number of orders, samples, and patterns
+
+        fseek(file, 0x0020, SEEK_SET);
+        fread(&ordnum, 2, 1, file);
+        fread(&insnum, 2, 1, file);
+        fread(&patnum, 2, 1, file);
+
+        if (ordnum & 0x0001) {
+            sprintf(tmpmsg, "OrdNum is an odd number (%d)", ordnum);
+            gr_warn(tmpmsg, argv[fileidx]);
+        }
+
+        // read pattern pointers
+
+        uint16_t ppos [patnum];
+        fseek(file, 0x0060 + ordnum + insnum * 2, SEEK_SET);
+        if (fread(ppos, 2, patnum, file) < patnum) {
+            gr_error("List of pattern offsets is too short", argv[fileidx]);
+            exitcode |= GR_EXIT_FILE_OUT_OF_BOUNDS;
+            continue;
+        }
+
+        // process patterns
+
+        printf("Processing %d patterns in file %s\n", patnum, argv[fileidx]);
+
+        for (pidx = 0; pidx < patnum; pidx++) {
+
+            if (ppos[pidx] << 4 >= filesize) {
+                sprintf(
+                    tmpmsg,
+                    "Offset out of bounds for pattern %d, skipping to %d",
+                    pidx, pidx + 1
+                );
+                gr_error(tmpmsg, argv[fileidx]);
+                exitcode |= GR_EXIT_FILE_OUT_OF_BOUNDS;
+                continue;
+            }
+            if (!ppos[pidx]) continue;
+
+            fseek(file, ppos[pidx] << 4, SEEK_SET);
+            fread(&psize, 2, 1, file);          // read first two bytes as size
+            fseek(file, -2, SEEK_CUR);
+
+            char pattern [psize];
+            if (fread(pattern, psize, 1, file) < 1) {
+                sprintf(
+                    tmpmsg,
+                    "Pattern %d ends prematurely, skipping to %d",
+                    pidx, pidx + 1
+                );
+                gr_error(tmpmsg, argv[fileidx]);
+                exitcode |= GR_EXIT_FILE_OUT_OF_BOUNDS;
+                continue;
+            }
+
+            fseek(file, -psize, SEEK_CUR);
+            gr_cipher(pattern, psize);          // de(/en)crypt the data
+            if (fwrite(pattern, psize, 1, file) < 1) {
+                sprintf(tmpmsg, "Could not write pattern %d", pidx);
+                gr_error(tmpmsg, argv[fileidx]);
+                exitcode |= GR_EXIT_IO_ERROR;
+                continue;
+            }
+
+        }
+
+        printf("File %s done\n", argv[fileidx]);
+
+        fclose(file);
 
     }
 
-    puts("DONE");
+    puts("========================================");
 
-    fclose(outfile);
+    return exitcode;
 
 }

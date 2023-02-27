@@ -1,3 +1,2 @@
 bin
-test/MUSIC0_U.S3M
-test/MUSIC1_U.S3M
+test/*_d.s3m
