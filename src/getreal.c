@@ -1,7 +1,7 @@
 /*
  * ==========================================================================
  * getreal.c
- * v1.0.0-alpha1
+ * v1.0.0-alpha2
  * 2023-02-27
  * ==========================================================================
  * by cs127
@@ -11,8 +11,6 @@
  * in the music files for the 1993 demo Second Reality:
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC0.S3M
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC1.S3M
- * ==========================================================================
- * update v1.0.0-alpha1 / 2023-02-27: I have slightly unshittified the code.
  * ==========================================================================
  */
 
@@ -132,6 +130,7 @@ int main(int argc, char** argv) {
         if (memcmp(magic, S3M_MAGIC, 4)) {
             gr_error("Not a valid S3M file", argv[fileidx]);
             exitcode |= GR_EXIT_INVALID_FILE_FORMAT;
+            fclose(file);
             continue;
         }
 
@@ -154,6 +153,7 @@ int main(int argc, char** argv) {
         if (fread(ppos, 2, patnum, file) < patnum) {
             gr_error("List of pattern offsets is too short", argv[fileidx]);
             exitcode |= GR_EXIT_FILE_OUT_OF_BOUNDS;
+            fclose(file);
             continue;
         }
 
