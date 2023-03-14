@@ -8,7 +8,7 @@
  * https://cs127.github.io
  * ==========================================================================
  * Command-line tool for decrypting/encrypting patterns in S3M files, as seen
- * in the music files for the 1993 demo Second Reality:
+ * in the music files for Future Crew's 1993 demo Second Reality:
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC0.S3M
  * https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC1.S3M
  * ==========================================================================
@@ -120,7 +120,6 @@ int main(int argc, char** argv) {
 
         fseek(file, 0, SEEK_END);
         filesize = ftell(file);
-        rewind(file); // be kind, rewind :)
 
         // check if the file is a valid S3M file
 

@@ -1,9 +1,9 @@
-# getreal.c
+# get real
 
 ![get real](getreal.gif)
 
 A command-line tool written in C for decrypting/encrypting patterns in
-S3M files, as seen in the music files for the 1993 demo Second Reality:
+S3M files, as seen in the music files for Future Crew's 1993 demo Second Reality:
 * [MUSIC0.S3M](https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC0.S3M)
 * [MUSIC1.S3M](https://github.com/mtuomi/SecondReality/raw/master/MAIN/MUSIC1.S3M)
 
